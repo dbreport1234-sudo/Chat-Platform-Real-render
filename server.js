@@ -66,7 +66,21 @@ const blockedExt=new Set(['.html','.htm','.js','.mjs','.cjs','.php','.asp','.asp
 const storage=multer.diskStorage({destination:uploadDir,filename:(req,file,cb)=>cb(null,Date.now()+'_'+crypto.randomBytes(12).toString('hex')+path.extname(safeName(file.originalname)).toLowerCase())});
 const upload=multer({storage,limits:{fileSize:MAX_UPLOAD_MB*1024*1024,files:MAX_UPLOAD_FILES,fields:10,fieldSize:100*1024,fieldNameSize:200,fieldArraySize:100,fieldArrayIndexLimit:1000},fileFilter:(req,file,cb)=>{if(blockedExt.has(path.extname(safeName(file.originalname)).toLowerCase()))return cb(new Error('ชนิดไฟล์นี้ถูกปิดเพื่อความปลอดภัย'));cb(null,true)}});
 
-app.set('trust proxy',1); app.use(helmet({crossOriginResourcePolicy:{policy:'same-site'}}));
+app.set('trust proxy',1);
+app.use(helmet({
+  crossOriginResourcePolicy:{policy:'same-site'},
+  contentSecurityPolicy:{
+    directives:{
+      defaultSrc:["'self'"],
+      scriptSrc:["'self'","'unsafe-inline'"],
+      styleSrc:["'self'","'unsafe-inline'"],
+      imgSrc:["'self'",'data:','blob:'],
+      connectSrc:["'self'",'ws:','wss:','https:'],
+      frameSrc:["'self'"],
+      objectSrc:["'none'"]
+    }
+  }
+}));
 app.use(cors({origin:corsOrigin,credentials:true}));
 app.use(express.json({limit:'2mb',verify:(req,res,buf)=>{if(req.path.startsWith('/api/v1/webhooks/'))req.rawBody=Buffer.from(buf)}}));
 app.use(express.urlencoded({extended:true,limit:'100kb'}));

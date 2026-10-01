@@ -1,0 +1,1 @@
+Chat Platform Real V5 - Render fixed: relative API URLs, CSP compatibility, service-worker cache refresh.

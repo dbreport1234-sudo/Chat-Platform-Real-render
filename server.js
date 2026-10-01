@@ -15,20 +15,38 @@ const {JSONFile}=require('lowdb/node');
 const {Server}=require('socket.io');
 
 const PORT=Number(process.env.PORT||3000);
-const JWT_SECRET=String(process.env.JWT_SECRET||'');
 const MAX_UPLOAD_MB=Math.max(1,Math.min(100,Number(process.env.MAX_UPLOAD_MB||25)));
 const MAX_UPLOAD_FILES=Math.max(1,Math.min(20,Number(process.env.MAX_UPLOAD_FILES||10)));
-if(JWT_SECRET.length<32){console.error('JWT_SECRET must be at least 32 characters. Edit .env');process.exit(1)}
+const dataDir=path.resolve(process.env.DATA_DIR||path.join(__dirname,'data'));
+const uploadDir=path.resolve(process.env.UPLOAD_DIR||path.join(__dirname,'uploads'));
+const publicDir=path.join(__dirname,'public');
+fs.mkdirSync(dataDir,{recursive:true}); fs.mkdirSync(uploadDir,{recursive:true});
+
+// Render-safe JWT secret handling:
+// 1) Use JWT_SECRET when supplied by Render Environment Variables.
+// 2) Otherwise create and persist a random secret under DATA_DIR. This allows
+// an existing Render service to boot even if JWT_SECRET was not configured.
+const jwtSecretFile=path.join(dataDir,'.jwt-secret');
+let JWT_SECRET=String(process.env.JWT_SECRET||'').trim();
+if(JWT_SECRET.length<32){
+  try {
+    if(fs.existsSync(jwtSecretFile)) JWT_SECRET=fs.readFileSync(jwtSecretFile,'utf8').trim();
+    if(JWT_SECRET.length<32){
+      JWT_SECRET=crypto.randomBytes(48).toString('base64url');
+      fs.writeFileSync(jwtSecretFile,JWT_SECRET,{encoding:'utf8',mode:0o600});
+      console.log('JWT_SECRET was not set; generated a persistent secret in DATA_DIR.');
+    }
+  } catch(e) {
+    console.error('Unable to create JWT secret:',e.message);
+    process.exit(1);
+  }
+}
 
 const app=express(); const server=http.createServer(app);
 const corsConfigured=String(process.env.CORS_ORIGINS||'').trim();
 const origins=corsConfigured.split(',').map(x=>x.trim()).filter(Boolean);
 const corsOrigin=(origin,cb)=>{ if(!origin || !origins.length || origins.includes(origin)) return cb(null,true); return cb(new Error('CORS blocked')); };
 const io=new Server(server,{cors:{origin:corsOrigin,credentials:true}});
-const dataDir=path.resolve(process.env.DATA_DIR||path.join(__dirname,'data'));
-const uploadDir=path.resolve(process.env.UPLOAD_DIR||path.join(__dirname,'uploads'));
-const publicDir=path.join(__dirname,'public');
-fs.mkdirSync(dataDir,{recursive:true}); fs.mkdirSync(uploadDir,{recursive:true});
 const db=new Low(new JSONFile(path.join(dataDir,'db.json')),{users:[],groups:[],channels:[],members:[],messages:[],reactions:[],webhooks:[],webhookLogs:[],notifications:[],audit:[]});
 const now=()=>new Date().toISOString(); const id=p=>p+'_'+crypto.randomBytes(9).toString('hex');
 const safeUser=u=>u?{id:u.id,username:u.username,displayName:u.displayName,avatar:u.avatar||'',createdAt:u.createdAt}:null;

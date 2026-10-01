@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: chat-platform-real
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    numInstances: 1
+    maxShutdownDelaySeconds: 30
+    disk:
+      name: chat-data
+      mountPath: /var/data
+      sizeGB: 10
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MAX_UPLOAD_MB
+        value: 25
+      - key: MAX_UPLOAD_FILES
+        value: 10
+      - key: DATA_DIR
+        value: /var/data/data
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: CORS_ORIGINS
+        value: ""
